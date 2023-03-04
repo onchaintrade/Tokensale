@@ -89,6 +89,7 @@ contract SaleToken is Ownable {
     }
 
     function setEndTime(uint256 _endAt) externa onlyOwner{
+        require(saleInfo.saleVolume == saleInfo.capMarketValue, "onlyAtEndTime");
         saleInfo.endAt = _endAt;
     }
 
