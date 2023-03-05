@@ -18,12 +18,12 @@ contract SaleToken is Ownable {
         uint256 saleTokenAmount;
         uint256 marketValue;
         uint256 capMarketValue;
-        uint256 saleVolume;
+        uint256 totalReceived;
     }
 
     struct Position {
         uint256 value;
-        bool isWithdraw;
+        bool claimed;
     }
 
     SaleInfo public saleInfo;
@@ -44,7 +44,7 @@ contract SaleToken is Ownable {
 
     modifier onlyAtEndTime(){
         // solhint-disable-next-line not-rely-on-time
-        require(block.timestamp > saleInfo.endAt || saleInfo.saleVolume == saleInfo.capMarketValue, "onlyAtEndTime");
+        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capMarketValue, "onlyAtEndTime");
         _;
     }
 
@@ -55,7 +55,7 @@ contract SaleToken is Ownable {
         uint256 saleTokenAmount,
         uint256 marketValue,
         uint256 capMarketValue,
-        uint256 saleVolume
+        uint256 totalReceived
     );
 
     constructor(
@@ -88,8 +88,8 @@ contract SaleToken is Ownable {
         }
     }
 
-    function setEndTime(uint256 _endAt) externa onlyOwner{
-        require(saleInfo.saleVolume == saleInfo.capMarketValue, "onlyAtEndTime");
+    function setEndTime(uint256 _endAt) external onlyOwner{
+        require(saleInfo.totalReceived == saleInfo.capMarketValue, "onlyAtEndTime");
         saleInfo.endAt = _endAt;
     }
 
@@ -98,11 +98,11 @@ contract SaleToken is Ownable {
         IERC20(_tokenAddress).safeTransferFrom(msg.sender, address(this), _tokenAmount);
         uint256 _saleValue = _tokenAmount * (10 ** (30 - IERC20Metadata(_tokenAddress).decimals()));
         userPosition[msg.sender].value += _saleValue;
-        saleInfo.saleVolume += _saleValue;
-        if(saleInfo.saleVolume == saleInfo.capMarketValue){
+        saleInfo.totalReceived += _saleValue;
+        if(saleInfo.totalReceived == saleInfo.capMarketValue){
             saleInfo.endAt = block.timestamp;
         }
-        require(saleInfo.saleVolume <= saleInfo.capMarketValue, "SaleVolume must lte CapMarketValue");
+        require(saleInfo.totalReceived <= saleInfo.capMarketValue, "totalReceived must lte CapMarketValue");
         userPositonStable[msg.sender][_tokenAddress] += _tokenAmount;
         supportStableCoinSaleNumber[_tokenAddress] += _tokenAmount;
         emit BuyToken(
@@ -112,16 +112,16 @@ contract SaleToken is Ownable {
             saleInfo.saleTokenAmount, 
             saleInfo.marketValue, 
             saleInfo.capMarketValue, 
-            saleInfo.saleVolume
+            saleInfo.totalReceived
         );
     }
 
-    function withdrawToken() external onlyAtEndTime {
-        require(!userPosition[msg.sender].isWithdraw, "You have already withdrawn");
-        userPosition[msg.sender].isWithdraw = true;
+    function claimOT() external onlyAtEndTime {
+        require(!userPosition[msg.sender].claimed, "You have already withdrawn");
+        userPosition[msg.sender].claimed = true;
         uint256 volume;
-        if (saleInfo.saleVolume > saleInfo.marketValue) {
-            volume = saleInfo.saleVolume;
+        if (saleInfo.totalReceived > saleInfo.marketValue) {
+            volume = saleInfo.totalReceived;
         } else {
             volume = saleInfo.marketValue;
         }
@@ -131,7 +131,7 @@ contract SaleToken is Ownable {
 
     function settleSaleToken(address to) external onlyOwner {
         require(!withdraw, "Admin have already withdraw");
-        require(block.timestamp > saleInfo.endAt || saleInfo.saleVolume == saleInfo.capMarketValue, "onlyAtEndTime");
+        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capMarketValue, "onlyAtEndTime");
         withdraw = true;
         for (uint i = 0; i < supportStableCoin.length; i++) {
             IERC20(supportStableCoin[i]).transfer(to, supportStableCoinSaleNumber[supportStableCoin[i]]);
@@ -143,7 +143,7 @@ contract SaleToken is Ownable {
         uint256 saleTokenAmount,
         uint256 marketValue,
         uint256 capMarketValue,
-        uint256 saleVolume,
+        uint256 totalReceived,
         uint256 userBuyTokenAmount, 
         address[] memory tokens,
         uint256[] memory tokensUserAmount,
@@ -154,10 +154,10 @@ contract SaleToken is Ownable {
         saleTokenAmount = saleInfo.saleTokenAmount;
         marketValue = saleInfo.marketValue;
         capMarketValue = saleInfo.capMarketValue;
-        saleVolume = saleInfo.saleVolume;
+        totalReceived = saleInfo.totalReceived;
         uint256 volume;
-        if (saleInfo.saleVolume > saleInfo.marketValue) {
-            volume = saleInfo.saleVolume;
+        if (saleInfo.totalReceived > saleInfo.marketValue) {
+            volume = saleInfo.totalReceived;
         } else {
             volume = saleInfo.marketValue;
         }
