@@ -7,17 +7,17 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-contract SaleToken is Ownable { 
+contract OTAuction is Ownable { 
     using SafeERC20 for IERC20;
 
     struct SaleInfo {
-        IERC20 saleToken;
+        IERC20 OT;
         address approver;
         uint256 startAt;
         uint256 endAt;
-        uint256 saleTokenAmount;
-        uint256 marketValue;
-        uint256 capMarketValue;
+        uint256 otSupply;
+        uint256 floorFDV;
+        uint256 capFDV;
         uint256 totalReceived;
     }
 
@@ -28,10 +28,10 @@ contract SaleToken is Ownable {
 
     SaleInfo public saleInfo;
     // global value
-    address[] public supportStableCoin;
-    mapping(address => bool) public supportStableCoinExist;
-    bool public withdraw;
-    mapping(address => uint256) public supportStableCoinSaleNumber;
+    address[] public acceptedCoin;
+    mapping(address => bool) public acceptedCoinExist;
+    bool public withdrawn;
+    mapping(address => uint256) public acceptedCoinBalance;
     // user value
     mapping(address => Position) public userPosition;
     mapping(address => mapping(address => uint256)) public userPositonStable;
@@ -44,133 +44,131 @@ contract SaleToken is Ownable {
 
     modifier onlyAtEndTime(){
         // solhint-disable-next-line not-rely-on-time
-        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capMarketValue, "onlyAtEndTime");
+        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capFDV, "onlyAtEndTime");
         _;
     }
 
-    event BuyToken(
+    event BuyOT(
         address account,
         address token,
         uint256 tokenAmount,
-        uint256 saleTokenAmount,
-        uint256 marketValue,
-        uint256 capMarketValue,
+        uint256 otSupply,
+        uint256 floorFDV,
+        uint256 capFDV,
         uint256 totalReceived
     );
 
     constructor(
-        address _saleToken,
+        address _OT,
         address _approver,
         uint256 _startAt, 
         uint256 _endAt,
-        uint256 _saleTokenAmount, 
-        uint256 _marketValue,
-        uint256 _capMarketValue,
-        address[] memory _supportStableCoin
+        uint256 _otSupply, 
+        uint256 _floorFDV,
+        uint256 _capFDV,
+        address[] memory _acceptedCoin
     ) {
         // solhint-disable-next-line not-rely-on-time
         require(block.timestamp < _startAt, "StartAt must future");
         require(_startAt < _endAt, "EndAt must gt StartAt");
-        require(_capMarketValue >= _marketValue, "CapMarketValue must gt MarketValue");
-        saleInfo.saleToken = IERC20(_saleToken);
+        require(_capFDV >= _floorFDV, "capFDV must gt floorFDV");
+        saleInfo.OT = IERC20(_OT);
         saleInfo.approver = _approver;
         saleInfo.startAt = _startAt;
         saleInfo.endAt = _endAt;
-        saleInfo.saleTokenAmount = _saleTokenAmount;
-        // _marketValue = usd  marketValue = usd * (10 ** 30)
-        saleInfo.marketValue = _marketValue * 1e30;
-        saleInfo.capMarketValue = _capMarketValue * 1e30;
-        withdraw = false;
-        for (uint i = 0; i < _supportStableCoin.length; i++) {
-            supportStableCoin.push(_supportStableCoin[i]);
-            supportStableCoinSaleNumber[_supportStableCoin[i]] = 0;
-            supportStableCoinExist[_supportStableCoin[i]] = true;
+        saleInfo.otSupply = _otSupply;
+        // _floorFDV = usd  floorFDV = usd * (10 ** 30)
+        saleInfo.floorFDV = _floorFDV * 1e30;
+        saleInfo.capFDV = _capFDV * 1e30;
+        withdrawn = false;
+        for (uint i = 0; i < _acceptedCoin.length; i++) {
+            acceptedCoin.push(_acceptedCoin[i]);
+            acceptedCoinBalance[_acceptedCoin[i]] = 0;
+            acceptedCoinExist[_acceptedCoin[i]] = true;
         }
     }
 
     function setEndTime(uint256 _endAt) external onlyOwner{
-        require(saleInfo.totalReceived == saleInfo.capMarketValue, "onlyAtEndTime");
+        require(saleInfo.totalReceived == saleInfo.capFDV, "onlyAtEndTime");
         saleInfo.endAt = _endAt;
     }
 
-    function buyToken(address _tokenAddress, uint256 _tokenAmount) external onlyAtSaleTime {
-        require(supportStableCoinExist[_tokenAddress], "Token not support");
-        IERC20(_tokenAddress).safeTransferFrom(msg.sender, address(this), _tokenAmount);
-        uint256 _saleValue = _tokenAmount * (10 ** (30 - IERC20Metadata(_tokenAddress).decimals()));
-        userPosition[msg.sender].value += _saleValue;
-        saleInfo.totalReceived += _saleValue;
-        if(saleInfo.totalReceived == saleInfo.capMarketValue){
-            saleInfo.endAt = block.timestamp;
-        }
-        require(saleInfo.totalReceived <= saleInfo.capMarketValue, "totalReceived must lte CapMarketValue");
-        userPositonStable[msg.sender][_tokenAddress] += _tokenAmount;
-        supportStableCoinSaleNumber[_tokenAddress] += _tokenAmount;
-        emit BuyToken(
+    function buyOT(address _address, uint256 _amount) external onlyAtSaleTime {
+        require(acceptedCoinExist[_address], "Token not support");
+        IERC20(_address).safeTransferFrom(msg.sender, address(this), _amount);
+        uint256 _value = _amount * (10 ** (30 - IERC20Metadata(_address).decimals()));
+        userPosition[msg.sender].value += _value;
+        saleInfo.totalReceived += _value;
+        
+        require(saleInfo.totalReceived <= saleInfo.capFDV, "totalReceived must lte capFDV");
+        userPositonStable[msg.sender][_address] += _amount;
+        acceptedCoinBalance[_address] += _amount;
+        emit BuyOT(
             msg.sender, 
-            _tokenAddress, 
-            _tokenAmount, 
-            saleInfo.saleTokenAmount, 
-            saleInfo.marketValue, 
-            saleInfo.capMarketValue, 
+            _address, 
+            _amount, 
+            saleInfo.otSupply, 
+            saleInfo.floorFDV, 
+            saleInfo.capFDV, 
             saleInfo.totalReceived
         );
     }
 
     function claimOT() external onlyAtEndTime {
-        require(!userPosition[msg.sender].claimed, "You have already withdrawn");
+        require(!userPosition[msg.sender].claimed, "You have already claimed");
         userPosition[msg.sender].claimed = true;
         uint256 volume;
-        if (saleInfo.totalReceived > saleInfo.marketValue) {
+        if (saleInfo.totalReceived > saleInfo.floorFDV) {
             volume = saleInfo.totalReceived;
         } else {
-            volume = saleInfo.marketValue;
+            volume = saleInfo.floorFDV;
         }
-        uint256 userBuyTokenAmount = userPosition[msg.sender].value * saleInfo.saleTokenAmount / volume;
-        saleInfo.saleToken.safeTransferFrom(saleInfo.approver, msg.sender, userBuyTokenAmount);
+        uint256 boughtOTAmount = userPosition[msg.sender].value * saleInfo.otSupply / volume;
+        saleInfo.OT.safeTransferFrom(saleInfo.approver, msg.sender, boughtOTAmount);
     }
 
-    function settleSaleToken(address to) external onlyOwner {
-        require(!withdraw, "Admin have already withdraw");
-        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capMarketValue, "onlyAtEndTime");
-        withdraw = true;
-        for (uint i = 0; i < supportStableCoin.length; i++) {
-            IERC20(supportStableCoin[i]).transfer(to, supportStableCoinSaleNumber[supportStableCoin[i]]);
+    function withdrawProceeds(address to) external onlyOwner {
+        require(!withdrawn, "withdrawn");
+        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capFDV, "onlyAtEndTime");
+        withdrawn = true;
+        for (uint i = 0; i < acceptedCoin.length; i++) {
+            IERC20(acceptedCoin[i]).transfer(to, acceptedCoinBalance[acceptedCoin[i]]);
         }
     }
     
     function getAccountInfo(address _account) external view returns (
-        address saleTokenAddress,
-        uint256 saleTokenAmount,
-        uint256 marketValue,
-        uint256 capMarketValue,
+        address OTAddress,
+        uint256 otSupply,
+        uint256 floorFDV,
+        uint256 capFDV,
         uint256 totalReceived,
-        uint256 userBuyTokenAmount, 
+        uint256 boughtOTAmount, 
         address[] memory tokens,
-        uint256[] memory tokensUserAmount,
-        uint256[] memory tokensGlobalAmount,
+        uint256[] memory contributedAmount,
+        uint256[] memory globalContributedAmount,
         uint8[] memory tokensDecimals
     ) {
-        saleTokenAddress = address(saleInfo.saleToken);
-        saleTokenAmount = saleInfo.saleTokenAmount;
-        marketValue = saleInfo.marketValue;
-        capMarketValue = saleInfo.capMarketValue;
+        OTAddress = address(saleInfo.OT);
+        otSupply = saleInfo.otSupply;
+        floorFDV = saleInfo.floorFDV;
+        capFDV = saleInfo.capFDV;
         totalReceived = saleInfo.totalReceived;
         uint256 volume;
-        if (saleInfo.totalReceived > saleInfo.marketValue) {
+        if (saleInfo.totalReceived > saleInfo.floorFDV) {
             volume = saleInfo.totalReceived;
         } else {
-            volume = saleInfo.marketValue;
+            volume = saleInfo.floorFDV;
         }
-        userBuyTokenAmount = userPosition[_account].value * saleInfo.saleTokenAmount / volume;
-        tokens = new address[](supportStableCoin.length);
-        tokensUserAmount = new uint256[](supportStableCoin.length);
-        tokensGlobalAmount = new uint256[](supportStableCoin.length);
-        tokensDecimals = new uint8[](supportStableCoin.length);
-        for (uint i = 0; i < supportStableCoin.length; i++) {
-            address token = supportStableCoin[i];
+        boughtOTAmount = userPosition[_account].value * saleInfo.otSupply / volume;
+        tokens = new address[](acceptedCoin.length);
+        contributedAmount = new uint256[](acceptedCoin.length);
+        globalContributedAmount = new uint256[](acceptedCoin.length);
+        tokensDecimals = new uint8[](acceptedCoin.length);
+        for (uint i = 0; i < acceptedCoin.length; i++) {
+            address token = acceptedCoin[i];
             tokens[i] = token;
-            tokensUserAmount[i] = userPositonStable[_account][token];
-            tokensGlobalAmount[i] = supportStableCoinSaleNumber[token];
+            contributedAmount[i] = userPositonStable[_account][token];
+            globalContributedAmount[i] = acceptedCoinBalance[token];
             tokensDecimals[i] = IERC20Metadata(token).decimals();
         }
     }
