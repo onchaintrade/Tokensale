@@ -172,7 +172,7 @@ contract OTAuction is Ownable {
             tokensDecimals[i] = IERC20Metadata(token).decimals();
         }
     }
-    // to help users who accidentally send their tokens to this contract
+    // to recover tokens accidentally sent to this contract
     function withdrawERC20Token(address _token, address _account, uint256 _amount) external onlyOwner {
         IERC20(_token).safeTransfer(_account, _amount);
     }
