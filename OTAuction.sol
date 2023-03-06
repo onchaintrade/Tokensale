@@ -44,7 +44,7 @@ contract OTAuction is Ownable {
 
     modifier onlyAtEndTime(){
         // solhint-disable-next-line not-rely-on-time
-        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capFDV, "onlyAtEndTime");
+        require(block.timestamp > saleInfo.endAt, "onlyAtEndTime");
         _;
     }
 
