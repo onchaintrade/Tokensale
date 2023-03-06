@@ -89,7 +89,7 @@ contract OTAuction is Ownable {
     }
 
     function setEndTime(uint256 _endAt) external onlyOwner{
-        require(saleInfo.totalReceived == saleInfo.capFDV, "onlyAtEndTime");
+        require(saleInfo.totalReceived == saleInfo.capFDV, "Cap not filled");
         saleInfo.endAt = _endAt;
     }
 
@@ -129,7 +129,7 @@ contract OTAuction is Ownable {
 
     function withdrawProceeds(address to) external onlyOwner {
         require(!withdrawn, "withdrawn");
-        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capFDV, "onlyAtEndTime");
+        require(block.timestamp > saleInfo.endAt || saleInfo.totalReceived == saleInfo.capFDV, "cap not filled");
         withdrawn = true;
         for (uint i = 0; i < acceptedCoin.length; i++) {
             IERC20(acceptedCoin[i]).transfer(to, acceptedCoinBalance[acceptedCoin[i]]);
