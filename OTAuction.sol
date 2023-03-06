@@ -94,13 +94,13 @@ contract OTAuction is Ownable {
     }
 
     function buyOT(address _address, uint256 _amount) external onlyAtSaleTime {
-        require(acceptedCoinExist[_address], "Token not support");
+        require(acceptedCoinExist[_address], "Token not supported");
         IERC20(_address).safeTransferFrom(msg.sender, address(this), _amount);
         uint256 _value = _amount * (10 ** (30 - IERC20Metadata(_address).decimals()));
         userPosition[msg.sender].value += _value;
         saleInfo.totalReceived += _value;
         
-        require(saleInfo.totalReceived <= saleInfo.capFDV, "totalReceived must lte capFDV");
+        require(saleInfo.totalReceived <= saleInfo.capFDV, "cap is filled");
         userPositonStable[msg.sender][_address] += _amount;
         acceptedCoinBalance[_address] += _amount;
         emit BuyOT(
