@@ -43,12 +43,6 @@ contract OTAuction is Ownable {
         _;
     }
 
-    // modifier onlyAtEndTime(){
-    //     // solhint-disable-next-line not-rely-on-time
-    //     require(block.timestamp > saleInfo.endAt, "Not ended");
-    //     _;
-    // }
-
     event BuyOT(
         address account,
         address token,
