@@ -89,11 +89,6 @@ contract OTAuction is Ownable {
         }
     }
 
-    // function setEndTime(uint256 _endAt) external onlyOwner{
-    //     require(saleInfo.totalReceived == saleInfo.capMKTValue, "Cap not filled");
-    //     saleInfo.endAt = _endAt;
-    // }
-
     function _allowClaim() external onlyOwner{
         allowClaim = true;
     }
