@@ -115,6 +115,7 @@ contract OTAuction is Ownable {
     }
 
     function claimOT() external {
+        require(userPosition[msg.sender].value > 0, "You don't have a position");
         require(!userPosition[msg.sender].claimed, "You have already claimed");
         require(allowClaim, "Not allowed to claim");
         userPosition[msg.sender].claimed = true;
